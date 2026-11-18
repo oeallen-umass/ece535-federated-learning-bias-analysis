@@ -1,4 +1,3 @@
-
 import numpy as np
 from torchvision import datasets
 from data import load_data
@@ -69,6 +68,58 @@ def print_client_distribution(dataset, partitions):
             f"{len(indices):5d} | "
             f"{counts.tolist()}"
         )
+
+
+def partition_test_like_train(
+    train_data,
+    test_data,
+    train_partitions,
+    seed=42
+):
+    """
+    Partition held-out test images to approximately match
+    each client's training class distribution.
+    """
+    rng = np.random.default_rng(seed)
+
+    train_labels = np.asarray(train_data.targets)
+    test_labels = np.asarray(test_data.targets)
+
+    num_clients = len(train_partitions)
+    num_classes = 10
+
+    client_test_indices = [[] for _ in range(num_clients)]
+
+    for class_id in range(num_classes):
+        # Count training examples of this class per client
+        counts = np.array([
+            np.sum(train_labels[indices] == class_id)
+            for indices in train_partitions
+        ], dtype=float)
+
+        # Distribute this class's test images proportionally
+        proportions = counts / counts.sum()
+
+        class_indices = np.where(test_labels == class_id)[0]
+        rng.shuffle(class_indices)
+
+        # Multinomial ensures all test images are assigned
+        split_sizes = rng.multinomial(
+            len(class_indices),
+            proportions
+        )
+
+        start = 0
+        for client_id, size in enumerate(split_sizes):
+            client_test_indices[client_id].extend(
+                class_indices[start:start + size].tolist()
+            )
+            start += size
+
+    for indices in client_test_indices:
+        rng.shuffle(indices)
+
+    return client_test_indices
 
 
 if __name__ == "__main__":

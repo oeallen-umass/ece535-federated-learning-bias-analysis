@@ -1,5 +1,6 @@
+import numpy as np
 import torch
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Subset
 
 from data import load_data
 from model import FashionCNN
@@ -28,15 +29,37 @@ def evaluate_model(model, test_data, batch_size=128):
 
             total += labels.size(0)
 
-    accuracy = 100 * correct / total
+    return 100 * correct / total
 
-    return accuracy
+
+def evaluate_clients(model, test_data, client_partitions):
+    """
+    Evaluate the global model separately for each client.
+    Each client receives a held-out test subset.
+    """
+    accuracies = []
+
+    for client_id, indices in enumerate(client_partitions):
+        client_test_data = Subset(test_data, indices)
+
+        accuracy = evaluate_model(model, client_test_data)
+        accuracies.append(accuracy)
+
+        print(
+            f"Client {client_id} test accuracy: "
+            f"{accuracy:.2f}%"
+        )
+
+    print("\nFairness metrics:")
+    print(f"Mean client accuracy: {np.mean(accuracies):.2f}%")
+    print(f"Worst client accuracy: {np.min(accuracies):.2f}%")
+    print(f"Accuracy standard deviation: {np.std(accuracies):.2f}")
+
+    return accuracies
 
 
 if __name__ == "__main__":
-    # Test the evaluation function
     _, test_data = load_data()
-
     model = FashionCNN()
 
     accuracy = evaluate_model(model, test_data)
