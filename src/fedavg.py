@@ -13,6 +13,7 @@ from partition import (
 )
 from client import train_client
 from evaluate import evaluate_model, evaluate_clients
+from results import save_round_results, save_client_results
 
 
 def federated_average(client_weights, client_sizes):
@@ -75,6 +76,9 @@ def train_fedavg(
     if distribution == "non_iid":
         print(f"Dirichlet alpha: {alpha}")
 
+    # Store training results
+    round_results = []
+
     # Federated training rounds
     for round_num in range(rounds):
         print(
@@ -136,8 +140,15 @@ def train_fedavg(
             flush=True
         )
 
-    # Create held-out test partitions that approximately
-    # match each client's training class distribution
+        # Record round results
+        round_results.append((
+            round_num + 1,
+            avg_loss,
+            accuracy
+        ))
+
+    # Create held-out test partitions matching
+    # each client's training class distribution
     client_test_partitions = partition_test_like_train(
         train_data,
         test_data,
@@ -152,6 +163,19 @@ def train_fedavg(
         global_model,
         test_data,
         client_test_partitions
+    )
+
+    # Save training and fairness results
+    save_round_results(
+        "fedavg",
+        distribution,
+        round_results
+    )
+
+    save_client_results(
+        "fedavg",
+        distribution,
+        client_accuracies
     )
 
     print("\nFedAvg training complete!")
